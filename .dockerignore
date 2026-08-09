@@ -1,0 +1,21 @@
+# Virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Data
+Acoustics_Extracted/
+**/*.csv
+**/*.jpg
+**/*.png
+
+# Ignore models except the best checkpoints
+thermal_classifier/outputs/*
+!thermal_classifier/outputs/best_efficientnet_b0.pt
+acoustic_classifier/outputs/*
+!acoustic_classifier/outputs/best_efficientnet_b0_acoustic.pt
+
+# Ignore frontend build caches if any
+.DS_Store

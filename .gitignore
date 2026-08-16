@@ -23,3 +23,5 @@ acoustic_classifier/outputs/*
 
 # Ignore frontend build caches if any
 .DS_Store
+*.db
+webapp/static/audio/

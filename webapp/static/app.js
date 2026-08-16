@@ -3,8 +3,14 @@ const fileInput = document.getElementById("fileInput");
 const browseBtn = document.getElementById("browseBtn");
 const previewWrap = document.getElementById("previewWrap");
 const preview = document.getElementById("preview");
+const imagePreviewContainer = document.getElementById("imagePreviewContainer");
+const csvPreviewContainer = document.getElementById("csvPreviewContainer");
+const csvName = document.getElementById("csvName");
 const results = document.getElementById("results");
 const statusEl = document.getElementById("status");
+
+let thermalFile = null;
+let acousticFile = null;
 
 function fmt(n, digits = 4) {
   if (!Number.isFinite(n)) return "—";
@@ -18,51 +24,92 @@ function setStatus(msg, isError = false) {
   statusEl.classList.toggle("error", Boolean(isError));
 }
 
-function showPreview(file) {
-  if (file.type.startsWith("image/")) {
-    const url = URL.createObjectURL(file);
+function updatePreviews() {
+  if (thermalFile) {
+    const url = URL.createObjectURL(thermalFile);
     preview.src = url;
-    preview.classList.remove("hidden");
-    if(document.getElementById("csvPreview")) document.getElementById("csvPreview").classList.add("hidden");
+    imagePreviewContainer.classList.remove("hidden");
   } else {
-    preview.classList.add("hidden");
-    let csvPrev = document.getElementById("csvPreview");
-    if (!csvPrev) {
-        csvPrev = document.createElement("div");
-        csvPrev.id = "csvPreview";
-        Object.assign(csvPrev.style, {
-            position: "absolute", inset: "0", display: "flex", flexDirection: "column",
-            justifyContent: "center", alignItems: "center", background: "var(--bg2)", zIndex: "0"
-        });
-        csvPrev.innerHTML = `<div style="font-size:3rem">📊</div><div id="csvName" style="margin-top:1rem;color:var(--ink);word-break:break-all;padding:0 2rem;text-align:center;"></div>`;
-        previewWrap.appendChild(csvPrev);
-    }
-    csvPrev.classList.remove("hidden");
-    document.getElementById("csvName").textContent = file.name;
+    imagePreviewContainer.classList.add("hidden");
   }
-  previewWrap.classList.remove("hidden");
-  dropzone.classList.add("has-image");
+  
+  if (acousticFile) {
+    csvName.textContent = acousticFile.name;
+    csvPreviewContainer.classList.remove("hidden");
+  } else {
+    csvPreviewContainer.classList.add("hidden");
+  }
+
+  if (thermalFile || acousticFile) {
+    previewWrap.classList.remove("hidden");
+    dropzone.classList.add("has-image");
+  } else {
+    previewWrap.classList.add("hidden");
+    dropzone.classList.remove("has-image");
+  }
 }
 
 function renderResult(data) {
-  document.getElementById("qualityCode").textContent = data.quality;
-  document.getElementById("qualityLabel").textContent = data.quality_label;
-  document.getElementById("confidence").textContent =
-    `${(data.confidence * 100).toFixed(1)}%`;
+  // Support both legacy single-file format and dual-upload format
+  const isDual = data.prediction !== undefined;
+  
+  const quality = isDual ? data.prediction.label : data.quality;
+  const qualityLabel = isDual ? data.prediction.label : data.quality_label;
+  const conf = isDual ? data.prediction.confidence : data.confidence;
+  
+  // Try to map to CPB or healthy logic
+  let isCPB = false;
+  if (isDual) {
+    isCPB = qualityLabel === "Cocoa Pod Borer";
+  } else {
+    isCPB = quality === "CPB";
+  }
+  
+  // Set quality code based on label if not provided
+  let qCode = isDual ? qualityLabel.charAt(0) : quality;
+  if (qCode === "C") qCode = "CPB";
+  if (qCode === "O") qCode = "OR";
+  if (qCode === "U") qCode = "UR";
+  
+  document.getElementById("qualityCode").textContent = qCode;
+  document.getElementById("qualityLabel").textContent = qualityLabel;
+  document.getElementById("confidence").textContent = `${(conf * 100).toFixed(1)}%`;
 
-  document.getElementById("amplitude").textContent = fmt(data.amplitude.value);
-  document.getElementById("amplitudeUnit").textContent =
-    data.amplitude.unit || "RMS";
-  document.getElementById("frequency").textContent = fmt(data.frequency.value, 1);
-  document.getElementById("frequencyUnit").textContent =
-    data.frequency.unit || "Hz";
-  document.getElementById("power").textContent = fmt(data.power.value);
-  document.getElementById("powerUnit").textContent =
-    data.power.unit || "mean-square";
+  const isHealthy = !isCPB;
+  const healthEl = document.getElementById("healthStatus");
+  healthEl.textContent = isHealthy ? "Healthy" : "Infested";
+  healthEl.style.color = isHealthy ? "var(--accent)" : "var(--danger)";
+  healthEl.style.textShadow = isHealthy ? "0 0 15px var(--accent-glow)" : "0 0 15px rgba(255, 85, 85, 0.4)";
+
+  // Features
+  let amp, freq, pwr;
+  if (isDual) {
+    amp = data.features.amplitude;
+    freq = data.features.frequency;
+    pwr = data.features.power;
+    document.getElementById("amplitude").textContent = fmt(amp);
+    document.getElementById("amplitudeUnit").textContent = "RMS";
+    document.getElementById("frequency").textContent = fmt(freq, 1);
+    document.getElementById("frequencyUnit").textContent = "Hz";
+    document.getElementById("power").textContent = fmt(pwr);
+    document.getElementById("powerUnit").textContent = "mean-square";
+  } else {
+    document.getElementById("amplitude").textContent = fmt(data.amplitude.value);
+    document.getElementById("amplitudeUnit").textContent = data.amplitude.unit || "RMS";
+    document.getElementById("frequency").textContent = fmt(data.frequency.value, 1);
+    document.getElementById("frequencyUnit").textContent = data.frequency.unit || "Hz";
+    document.getElementById("power").textContent = fmt(data.power.value);
+    document.getElementById("powerUnit").textContent = data.power.unit || "mean-square";
+  }
 
   const probs = document.getElementById("probs");
   probs.innerHTML = "";
-  Object.entries(data.class_probabilities || {}).forEach(([cls, p]) => {
+  
+  const classProbs = isDual ? data.probabilities : Object.entries(data.class_probabilities || {}).map(([c, p]) => ({label: c, confidence: p}));
+  
+  classProbs.forEach((item) => {
+    let cls = item.label || item[0];
+    let p = item.confidence !== undefined ? item.confidence : item[1];
     const div = document.createElement("div");
     div.className = "prob";
     div.innerHTML = `<div><strong>${cls}</strong> ${(p * 100).toFixed(1)}%</div>
@@ -73,14 +120,19 @@ function renderResult(data) {
   results.classList.remove("hidden");
 }
 
-async function predict(file) {
-  showPreview(file);
-  results.classList.add("hidden"); // Hide previous results while loading
+async function predict() {
+  if (!thermalFile || !acousticFile) {
+    setStatus("Please upload both an image and a CSV file.", true);
+    return;
+  }
+
+  results.classList.add("hidden");
   dropzone.classList.add("loading");
-  setStatus(`Analyzing ${file.name.endsWith('.csv') ? 'waveform' : 'thermal image'}…`);
+  setStatus(`Analyzing...`);
 
   const body = new FormData();
-  body.append("file", file);
+  body.append("thermal_image", thermalFile);
+  body.append("acoustic_file", acousticFile);
 
   try {
     const res = await fetch("/api/predict", { method: "POST", body });
@@ -89,7 +141,7 @@ async function predict(file) {
       throw new Error(data.detail || "Prediction failed");
     }
     renderResult(data);
-    setStatus(`Done · ${data.filename || file.name}`);
+    setStatus(`Done · Result ready`);
   } catch (err) {
     setStatus(err.message || String(err), true);
   } finally {
@@ -97,17 +149,34 @@ async function predict(file) {
   }
 }
 
-function onFiles(files) {
-  const file = files && files[0];
-  if (!file) return;
-  const isImage = file.type.startsWith("image/");
-  const isCsv = file.name.toLowerCase().endsWith(".csv") || file.type.includes("csv");
-  if (!isImage && !isCsv) {
-    setStatus("Please upload an image or CSV file.", true);
-    results.classList.remove("hidden");
-    return;
+function processFiles(files) {
+  if (!files || files.length === 0) return;
+  
+  let newThermal = false;
+  let newAcoustic = false;
+  
+  Array.from(files).forEach(file => {
+    const isImage = file.type.startsWith("image/");
+    const isCsv = file.name.toLowerCase().endsWith(".csv") || file.type.includes("csv") || file.name.toLowerCase().endsWith(".tdms");
+    
+    if (isImage) {
+      thermalFile = file;
+      newThermal = true;
+    } else if (isCsv) {
+      acousticFile = file;
+      newAcoustic = true;
+    }
+  });
+  
+  updatePreviews();
+  
+  if (thermalFile && acousticFile && (newThermal || newAcoustic)) {
+    predict();
+  } else if (!thermalFile && acousticFile) {
+    setStatus("Waveform added. Now add a thermal image.", false);
+  } else if (thermalFile && !acousticFile) {
+    setStatus("Image added. Now add an acoustic waveform.", false);
   }
-  predict(file);
 }
 
 browseBtn.addEventListener("click", (e) => {
@@ -123,7 +192,7 @@ dropzone.addEventListener("keydown", (e) => {
   }
 });
 
-fileInput.addEventListener("change", () => onFiles(fileInput.files));
+fileInput.addEventListener("change", () => processFiles(fileInput.files));
 
 ["dragenter", "dragover"].forEach((evt) => {
   dropzone.addEventListener(evt, (e) => {
@@ -139,4 +208,4 @@ fileInput.addEventListener("change", () => onFiles(fileInput.files));
   });
 });
 
-dropzone.addEventListener("drop", (e) => onFiles(e.dataTransfer.files));
+dropzone.addEventListener("drop", (e) => processFiles(e.dataTransfer.files));

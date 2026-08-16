@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Coaco — Thermal Quality</title>
+    <title>Cocoa — Thermal Quality</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,20 +19,26 @@
     
     <div class="page">
       <header class="top">
-        <div class="brand">Coaco</div>
+        <div class="brand">Cocoa</div>
         <p class="tagline">Intelligent pod quality analysis</p>
       </header>
 
       <main class="stage">
         <section class="upload-panel" id="dropzone" tabindex="0">
-          <input id="fileInput" type="file" accept="image/*,.csv" hidden />
+          <input id="fileInput" type="file" accept="image/*,.csv" multiple hidden />
           <div class="upload-copy">
-            <h1>Drop an image or waveform</h1>
-            <p>Thermal pod scan (JPG/PNG) or acoustic tap (CSV) · predicts quality metrics</p>
-            <button type="button" class="cta" id="browseBtn">Choose file</button>
+            <h1>Drop image and waveform</h1>
+            <p>Thermal pod scan (JPG/PNG) and acoustic tap (CSV) required.</p>
+            <button type="button" class="cta" id="browseBtn">Choose files</button>
           </div>
           <div class="preview-wrap hidden" id="previewWrap">
-            <img id="preview" alt="Uploaded thermal preview" />
+            <div id="imagePreviewContainer" class="preview-item hidden">
+              <img id="preview" alt="Thermal preview" />
+            </div>
+            <div id="csvPreviewContainer" class="preview-item hidden">
+              <div style="font-size:2rem">📊</div>
+              <div id="csvName" class="file-name"></div>
+            </div>
           </div>
         </section>
 
@@ -42,6 +48,10 @@
               <div class="eyebrow">Predicted quality</div>
               <div class="quality-code" id="qualityCode">—</div>
               <div class="quality-label" id="qualityLabel">—</div>
+            </div>
+            <div class="health">
+              <div class="eyebrow">Health Status</div>
+              <div class="health-value" id="healthStatus">—</div>
             </div>
             <div class="confidence">
               <div class="eyebrow">Confidence</div>

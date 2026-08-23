@@ -1,4 +1,177 @@
-/* ============================================
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cocoa Ripeness Analyser</title>
+<meta content="Predict cocoa pod ripeness with confidence using SVM-based thermal and acoustic signal fusion." name="description"/>
+<meta content="Cocoa Ripeness Analyser" property="og:title"/>
+<meta content="Predict cocoa pod ripeness with confidence using SVM-based thermal and acoustic signal fusion." property="og:description"/>
+<meta content="website" property="og:type"/>
+<link href="data:image/svg+xml,&lt;svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22&gt;&lt;text y=%22.9em%22 font-size=%2290%22&gt;🍫&lt;/text&gt;&lt;/svg&gt;" rel="icon"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+
+<style>
+      .page-bg-blobs {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .bg-blob {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          var(--accent-glow) 0%,
+          transparent 70%
+        );
+        opacity: 0.5;
+        filter: blur(40px);
+      }
+      .blob-1 {
+        top: -10%;
+        left: -10%;
+        width: 50vw;
+        height: 50vw;
+        max-width: 600px;
+        max-height: 600px;
+      }
+      .blob-2 {
+        bottom: 10%;
+        right: -5%;
+        width: 60vw;
+        height: 60vw;
+        max-width: 700px;
+        max-height: 700px;
+        opacity: 0.3;
+      }
+
+      /* Mindmap Styles */
+      .mindmap-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        padding: 1rem 0;
+        gap: 3rem;
+        z-index: 1;
+      }
+      .mindmap-col {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+        z-index: 1;
+      }
+      .mindmap-node {
+        padding: 1.2rem;
+        width: 240px;
+        text-align: left;
+        position: relative;
+        transition:
+          transform 0.3s ease,
+          border-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+      .mindmap-node:hover {
+        transform: translateY(-3px);
+        border-color: rgba(255, 107, 107, 0.8);
+        box-shadow: 0 8px 32px rgba(255, 107, 107, 0.25);
+      }
+      .mindmap-node.central-node {
+        border-color: rgba(255, 107, 107, 0.6);
+        box-shadow: 0 0 20px rgba(255, 107, 107, 0.1);
+      }
+      .mm-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(255, 107, 107, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+      }
+      .mm-title {
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.3rem;
+        letter-spacing: -0.01em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Contrast check */
+      }
+      .mm-desc {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.8rem;
+        line-height: 1.4;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* Contrast check */
+      }
+
+      .mindmap-svg-wrap {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .mindmap-svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Adjust navbar for sticky glass */
+      .navbar.glass-panel {
+        position: sticky;
+        top: 0;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        border-top: none;
+      }
+
+      /* Mobile Fallback */
+      @media (max-width: 900px) {
+        .mindmap-container {
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .mindmap-col {
+          gap: 1.5rem;
+          align-items: center;
+        }
+        .mindmap-svg-wrap {
+          display: none;
+        }
+        .mindmap-node::after {
+          content: "↓";
+          position: absolute;
+          bottom: -24px;
+          left: 50%;
+          transform: translateX(-50%);
+          color: rgba(255, 107, 107, 0.5);
+          font-size: 1.2rem;
+        }
+        .mindmap-node:last-child::after,
+        .mindmap-col:last-child .mindmap-node::after {
+          display: none;
+        }
+        .mindmap-col:nth-child(1)::after,
+        .mindmap-col:nth-child(2)::after {
+          content: "↓";
+          color: rgba(255, 107, 107, 0.5);
+          font-size: 1.2rem;
+          text-align: center;
+        }
+      }
+    </style>
+<style>/* ============================================
            QUANTIX - SaaS Landing Page Template
            Design: TemplateMo
            https://templatemo.com
@@ -2529,3 +2702,330 @@ a {
     grid-template-columns: 1fr;
   }
 }
+</style></head>
+<body>
+<!-- Fixed background blobs -->
+<div class="page-bg-blobs">
+<div class="bg-blob blob-1"></div>
+<div class="bg-blob blob-2"></div>
+</div>
+<!-- NAVBAR -->
+
+<!-- SECTION 1: HERO -->
+<section class="hero" style="position: relative; padding-bottom: 40px">
+<div class="hero-inner container" style="position: relative; z-index: 1">
+<div class="hero-content fade-up" style="max-width: 500px">
+<div class="hero-badge">
+<span class="badge-dot"></span>
+            SVM + Acoustic &amp; Thermal Fusion
+          </div>
+<h1>
+            Predict cocoa pod<br/><span class="gradient-text">ripeness with confidence</span>
+</h1>
+<p class="hero-desc" style="margin-bottom: 36px">
+            Upload a thermal image and acoustic tap recording — our SVM
+            classifier extracts signal features and predicts ripeness in
+            seconds.
+          </p>
+<div class="hero-cta">
+<a class="btn btn-primary btn-lg" href="analyser.html">Analyse Your Pod <span class="btn-arrow">→</span></a>
+</div>
+</div>
+<div class="hero-mockup fade-up">
+<div class="mockup-window glass-panel" style="padding: 2rem">
+<div class="mockup-toolbar" style="
+                margin-bottom: 2rem;
+                border-bottom: 1px solid var(--glass-border);
+                padding-bottom: 1rem;
+              ">
+<span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span>
+<span style='
+                  color: rgba(255, 255, 255, 0.7);
+                  font-size: 0.8rem;
+                  margin-left: 1rem;
+                  font-family: "JetBrains Mono", monospace;
+                  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                '>pipeline-architecture</span>
+</div>
+<div class="mindmap-container">
+<div class="mindmap-svg-wrap">
+<svg class="mindmap-svg" preserveaspectratio="none" viewbox="0 0 100 100">
+<path d="M 30 25 C 40 25, 40 50, 50 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-dasharray="1 1" stroke-width="0.3"></path>
+<path d="M 30 75 C 40 75, 40 50, 50 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-dasharray="1 1" stroke-width="0.3"></path>
+<path d="M 50 50 L 70 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-dasharray="1 1" stroke-width="0.3"></path>
+</svg>
+</div>
+<div class="mindmap-col">
+<div class="mindmap-node glass-panel">
+<div class="mm-icon">
+<svg fill="none" height="18" stroke="var(--accent)" stroke-width="2" viewbox="0 0 24 24" width="18">
+<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+</svg>
+</div>
+<div class="mm-title">Thermal Image</div>
+<div class="mm-desc">
+                    Surface temperature pattern of the pod
+                  </div>
+</div>
+<div class="mindmap-node glass-panel">
+<div class="mm-icon">
+<svg fill="none" height="18" stroke="var(--accent)" stroke-width="2" viewbox="0 0 24 24" width="18">
+<path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+</svg>
+</div>
+<div class="mm-title">Acoustic Signal</div>
+<div class="mm-desc">
+                    Vibration response from tapping the pod
+                  </div>
+</div>
+</div>
+<div class="mindmap-col">
+<div class="mindmap-node glass-panel central-node">
+<div class="mm-icon">
+<svg fill="none" height="18" stroke="var(--accent)" stroke-width="2" viewbox="0 0 24 24" width="18">
+<circle cx="12" cy="12" r="3"></circle>
+<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+</svg>
+</div>
+<div class="mm-title">SVM Fusion Model</div>
+<div class="mm-desc">
+                    Combines both signal types into one feature vector for
+                    classification
+                  </div>
+</div>
+</div>
+<div class="mindmap-col">
+<div class="mindmap-node glass-panel">
+<div class="mm-icon">
+<svg fill="none" height="18" stroke="var(--accent)" stroke-width="2" viewbox="0 0 24 24" width="18">
+<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+<line x1="12" x2="12" y1="22.08" y2="12"></line>
+</svg>
+</div>
+<div class="mm-title">Ripeness Prediction</div>
+<div class="mm-desc">Predicted label + confidence score</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: TEASER -->
+<section class="section" style="padding-top: 40px; padding-bottom: 40px">
+<div class="container" style="position: relative; z-index: 1">
+<div class="glass-panel fade-up" style="
+            padding: 2rem;
+            text-align: center;
+            border-radius: var(--radius);
+            border-color: rgba(255, 107, 107, 0.2);
+          ">
+<h3 style="
+              font-size: 24px;
+              font-weight: 700;
+              margin-bottom: 1rem;
+              color: var(--accent-light);
+            ">
+            Curious about the science?
+          </h3>
+<p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 1.5rem">
+            Read a detailed breakdown of how we extract features and train the
+            SVM classifier.
+          </p>
+<a class="btn btn-primary btn-lg" href="how-it-works.html">Read How It Works <span class="btn-arrow">→</span></a>
+</div>
+</div>
+</section>
+<!-- FOOTER -->
+<footer class="footer" style="position: relative; z-index: 1">
+<div class="container">
+<div class="footer-row-links">
+<a href="how-it-works.html">How It Works</a>
+<span class="footer-link-dot"></span>
+<a href="analyser.html">Analyser</a>
+</div>
+<div class="footer-row-bottom">
+<p class="footer-copy">
+            Copyright © 2026 Cocoa. Design:
+            <a href="https://templatemo.com" rel="nofollow" target="_blank">TemplateMo</a>
+</p>
+<div class="footer-right">
+<div class="footer-legal">
+<a href="#" onclick="return false;">Privacy</a>
+<a href="#" onclick="return false;">Terms</a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+<script>// NAVBAR
+const navbar = document.getElementById("navbar");
+window.addEventListener(
+  "scroll",
+  () => {
+    navbar.classList.toggle("scrolled", window.scrollY > 40);
+  },
+  { passive: true },
+);
+
+// MOBILE NAV
+const navToggle = document.getElementById("navToggle");
+const navLinks = document.getElementById("navLinks");
+navToggle.addEventListener("click", () => {
+  navToggle.classList.toggle("active");
+  navLinks.classList.toggle("open");
+});
+navLinks.querySelectorAll("a").forEach((link) => {
+  link.addEventListener("click", () => {
+    navToggle.classList.remove("active");
+    navLinks.classList.remove("open");
+  });
+});
+
+// FEATURE TABS
+const tabs = document.querySelectorAll(".feature-tab");
+const panels = document.querySelectorAll(".feature-panel");
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const target = tab.dataset.tab;
+
+    tabs.forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+
+    panels.forEach((p) => {
+      p.classList.remove("active");
+      if (p.dataset.panel === target) {
+        p.classList.add("active");
+      }
+    });
+  });
+});
+
+// PRICING TOGGLE
+const pricingToggle = document.getElementById("pricingToggle");
+const monthlyLabel = document.getElementById("monthlyLabel");
+const annualLabel = document.getElementById("annualLabel");
+const priceValues = document.querySelectorAll(".pricing-value");
+const pricePeriods = document.querySelectorAll(
+  ".pricing-period[data-annual-total]",
+);
+
+if (pricingToggle) {
+  let isAnnual = false;
+
+  pricingToggle.addEventListener("click", () => {
+    isAnnual = !isAnnual;
+    pricingToggle.classList.toggle("annual", isAnnual);
+    monthlyLabel.classList.toggle("active", !isAnnual);
+    annualLabel.classList.toggle("active", isAnnual);
+
+    priceValues.forEach((el) => {
+      const newVal = el.dataset[isAnnual ? "annual" : "monthly"];
+      // Skip animation for FREE label
+      if (newVal === "FREE") return;
+
+      el.classList.add("changing");
+      setTimeout(() => {
+        el.textContent = newVal;
+        el.classList.remove("changing");
+      }, 180);
+    });
+
+    pricePeriods.forEach((el) => {
+      if (isAnnual) {
+        const total = el.dataset.annualTotal;
+        el.innerHTML =
+          'per month <span class="period-yearly">($' +
+          total +
+          " per year)</span>";
+      } else {
+        el.innerHTML = el.dataset.monthly;
+      }
+    });
+  });
+}
+
+// COUNTER ANIMATION
+function animateCounter(el) {
+  const target = parseFloat(el.dataset.target);
+  const suffix = el.dataset.suffix || "";
+  const prefix = el.dataset.prefix || "";
+  const decimals = parseInt(el.dataset.decimal) || 0;
+  const useComma = el.dataset.comma === "true";
+  const duration = 1800;
+  const start = performance.now();
+
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    let val = eased * target;
+    val = decimals > 0 ? val.toFixed(decimals) : Math.round(val);
+    if (useComma) val = Number(val).toLocaleString();
+    el.textContent = prefix + val + suffix;
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// SCROLL REVEAL
+const prefersReducedMotion = window.matchMedia(
+  "(prefers-reduced-motion: reduce)",
+).matches;
+
+if (!prefersReducedMotion) {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const siblings = entry.target.parentElement.querySelectorAll(
+            ".fade-up:not(.visible)",
+          );
+          const idx = Array.from(siblings).indexOf(entry.target);
+          setTimeout(
+            () => entry.target.classList.add("visible"),
+            Math.max(0, idx) * 100,
+          );
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15, rootMargin: "0px 0px -30px 0px" },
+  );
+
+  document.querySelectorAll(".fade-up").forEach((el) => observer.observe(el));
+
+  const counterObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          animateCounter(entry.target);
+          counterObserver.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.5 },
+  );
+
+  document
+    .querySelectorAll(".stat-number[data-target]")
+    .forEach((el) => counterObserver.observe(el));
+} else {
+  document
+    .querySelectorAll(".fade-up")
+    .forEach((el) => el.classList.add("visible"));
+  document.querySelectorAll(".stat-number[data-target]").forEach((el) => {
+    const t = parseFloat(el.dataset.target);
+    const s = el.dataset.suffix || "";
+    const p = el.dataset.prefix || "";
+    const d = parseInt(el.dataset.decimal) || 0;
+    let v = d > 0 ? t.toFixed(d) : t;
+    if (el.dataset.comma === "true") v = Number(v).toLocaleString();
+    el.textContent = p + v + s;
+  });
+}
+</script></body>
+</html>

@@ -1,279 +1,441 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cocoa Ripeness Analyser</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="templatemo-quantix-style.css">
+    <meta name="description" content="Predict cocoa pod ripeness with confidence using SVM-based thermal and acoustic signal fusion." />
+    <meta property="og:title" content="Cocoa Ripeness Analyser" />
+    <meta property="og:description" content="Predict cocoa pod ripeness with confidence using SVM-based thermal and acoustic signal fusion." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍫</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="templatemo-quantix-style.css" />
     <style>
-        .page-bg-blobs {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            pointer-events: none;
-            overflow: hidden;
-        }
-        .bg-blob {
-            position: absolute;
-            border-radius: 50%;
-            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
-            opacity: 0.5;
-            filter: blur(40px);
-        }
-        .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; max-width: 600px; max-height: 600px; }
-        .blob-2 { bottom: 10%; right: -5%; width: 60vw; height: 60vw; max-width: 700px; max-height: 700px; opacity: 0.3; }
-        
-        /* Mindmap Styles */
+      .page-bg-blobs {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .bg-blob {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          var(--accent-glow) 0%,
+          transparent 70%
+        );
+        opacity: 0.5;
+        filter: blur(40px);
+      }
+      .blob-1 {
+        top: -10%;
+        left: -10%;
+        width: 50vw;
+        height: 50vw;
+        max-width: 600px;
+        max-height: 600px;
+      }
+      .blob-2 {
+        bottom: 10%;
+        right: -5%;
+        width: 60vw;
+        height: 60vw;
+        max-width: 700px;
+        max-height: 700px;
+        opacity: 0.3;
+      }
+
+      /* Mindmap Styles */
+      .mindmap-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        padding: 1rem 0;
+        gap: 3rem;
+        z-index: 1;
+      }
+      .mindmap-col {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+        z-index: 1;
+      }
+      .mindmap-node {
+        padding: 1.2rem;
+        width: 240px;
+        text-align: left;
+        position: relative;
+        transition:
+          transform 0.3s ease,
+          border-color 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+      .mindmap-node:hover {
+        transform: translateY(-3px);
+        border-color: rgba(255, 107, 107, 0.8);
+        box-shadow: 0 8px 32px rgba(255, 107, 107, 0.25);
+      }
+      .mindmap-node.central-node {
+        border-color: rgba(255, 107, 107, 0.6);
+        box-shadow: 0 0 20px rgba(255, 107, 107, 0.1);
+      }
+      .mm-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: rgba(255, 107, 107, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+      }
+      .mm-title {
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.3rem;
+        letter-spacing: -0.01em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Contrast check */
+      }
+      .mm-desc {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.8rem;
+        line-height: 1.4;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* Contrast check */
+      }
+
+      .mindmap-svg-wrap {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .mindmap-svg {
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Adjust navbar for sticky glass */
+      .navbar.glass-panel {
+        position: sticky;
+        top: 0;
+        margin: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        border-top: none;
+      }
+
+      /* Mobile Fallback */
+      @media (max-width: 900px) {
         .mindmap-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            padding: 1rem 0;
-            gap: 3rem;
-            z-index: 1;
+          flex-direction: column;
+          gap: 1.5rem;
         }
         .mindmap-col {
-            display: flex;
-            flex-direction: column;
-            gap: 2.5rem;
-            z-index: 1;
+          gap: 1.5rem;
+          align-items: center;
         }
-        .mindmap-node {
-            padding: 1.2rem;
-            width: 240px;
-            text-align: left;
-            position: relative;
-            transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-        .mindmap-node:hover {
-            transform: translateY(-3px);
-            border-color: rgba(255,107,107,0.8);
-            box-shadow: 0 8px 32px rgba(255,107,107,0.25);
-        }
-        .mindmap-node.central-node {
-            border-color: rgba(255,107,107,0.6);
-            box-shadow: 0 0 20px rgba(255,107,107,0.1);
-        }
-        .mm-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: rgba(255,107,107,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 0.75rem;
-        }
-        .mm-title {
-            color: #fff;
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 0.3rem;
-            letter-spacing: -0.01em;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Contrast check */
-        }
-        .mm-desc {
-            color: rgba(255,255,255,0.8);
-            font-size: 0.8rem;
-            line-height: 1.4;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Contrast check */
-        }
-        
         .mindmap-svg-wrap {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            pointer-events: none;
+          display: none;
         }
-        .mindmap-svg {
-            width: 100%;
-            height: 100%;
+        .mindmap-node::after {
+          content: "↓";
+          position: absolute;
+          bottom: -24px;
+          left: 50%;
+          transform: translateX(-50%);
+          color: rgba(255, 107, 107, 0.5);
+          font-size: 1.2rem;
         }
-
-        /* Adjust navbar for sticky glass */
-        .navbar.glass-panel {
-            position: sticky;
-            top: 0;
-            margin: 0;
-            border-radius: 0;
-            border-left: none;
-            border-right: none;
-            border-top: none;
+        .mindmap-node:last-child::after,
+        .mindmap-col:last-child .mindmap-node::after {
+          display: none;
         }
-        
-        /* Mobile Fallback */
-        @media (max-width: 900px) {
-            .mindmap-container {
-                flex-direction: column;
-                gap: 1.5rem;
-            }
-            .mindmap-col {
-                gap: 1.5rem;
-                align-items: center;
-            }
-            .mindmap-svg-wrap {
-                display: none;
-            }
-            .mindmap-node::after {
-                content: '↓';
-                position: absolute;
-                bottom: -24px;
-                left: 50%;
-                transform: translateX(-50%);
-                color: rgba(255,107,107,0.5);
-                font-size: 1.2rem;
-            }
-            .mindmap-node:last-child::after,
-            .mindmap-col:last-child .mindmap-node::after {
-                display: none;
-            }
-            .mindmap-col:nth-child(1)::after,
-            .mindmap-col:nth-child(2)::after {
-                content: '↓';
-                color: rgba(255,107,107,0.5);
-                font-size: 1.2rem;
-                text-align: center;
-            }
+        .mindmap-col:nth-child(1)::after,
+        .mindmap-col:nth-child(2)::after {
+          content: "↓";
+          color: rgba(255, 107, 107, 0.5);
+          font-size: 1.2rem;
+          text-align: center;
         }
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <!-- Fixed background blobs -->
     <div class="page-bg-blobs">
-        <div class="bg-blob blob-1"></div>
-        <div class="bg-blob blob-2"></div>
+      <div class="bg-blob blob-1"></div>
+      <div class="bg-blob blob-2"></div>
     </div>
 
     <!-- NAVBAR -->
     <nav class="navbar glass-panel" id="navbar">
-        <div class="container">
-            <a href="index.html" class="nav-brand">
-                <img src="cocoa-logo.svg?v=2" alt="Cocoa" class="brand-logo" width="140" height="36">
-            </a>
-            <ul class="nav-links" id="navLinks">
-                <li><a href="how-it-works.html">How It Works</a></li>
-                <li><a href="analyser.html">Analyser</a></li>
-            </ul>
-            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
-                <span></span><span></span><span></span>
-            </button>
-        </div>
+      <div class="container">
+        <a href="index.html" class="nav-brand">
+          <img
+            src="cocoa-logo.svg?v=2"
+            alt="Cocoa"
+            class="brand-logo"
+            width="140"
+            height="36"
+          />
+        </a>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="how-it-works.html">How It Works</a></li>
+          <li><a href="analyser.html">Analyser</a></li>
+        </ul>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
     </nav>
 
     <!-- SECTION 1: HERO -->
-    <section class="hero" style="position: relative; padding-bottom: 40px;">
-        <div class="hero-inner container" style="position: relative; z-index: 1;">
-            <div class="hero-content fade-up" style="max-width: 500px;">
-                <div class="hero-badge">
-                    <span class="badge-dot"></span>
-                    SVM + Acoustic &amp; Thermal Fusion
-                </div>
-                <h1>Predict cocoa pod<br><span class="gradient-text">ripeness with confidence</span></h1>
-                <p class="hero-desc" style="margin-bottom: 36px;">Upload a thermal image and acoustic tap recording — our SVM classifier extracts signal features and predicts ripeness in seconds.</p>
-                <div class="hero-cta">
-                    <a href="analyser.html" class="btn btn-primary btn-lg">Analyse Your Pod <span class="btn-arrow">&rarr;</span></a>
-                </div>
+    <section class="hero" style="position: relative; padding-bottom: 40px">
+      <div class="hero-inner container" style="position: relative; z-index: 1">
+        <div class="hero-content fade-up" style="max-width: 500px">
+          <div class="hero-badge">
+            <span class="badge-dot"></span>
+            SVM + Acoustic &amp; Thermal Fusion
+          </div>
+          <h1>
+            Predict cocoa pod<br /><span class="gradient-text"
+              >ripeness with confidence</span
+            >
+          </h1>
+          <p class="hero-desc" style="margin-bottom: 36px">
+            Upload a thermal image and acoustic tap recording — our SVM
+            classifier extracts signal features and predicts ripeness in
+            seconds.
+          </p>
+          <div class="hero-cta">
+            <a href="analyser.html" class="btn btn-primary btn-lg"
+              >Analyse Your Pod <span class="btn-arrow">&rarr;</span></a
+            >
+          </div>
+        </div>
+
+        <div class="hero-mockup fade-up">
+          <div class="mockup-window glass-panel" style="padding: 2rem">
+            <div
+              class="mockup-toolbar"
+              style="
+                margin-bottom: 2rem;
+                border-bottom: 1px solid var(--glass-border);
+                padding-bottom: 1rem;
+              "
+            >
+              <span class="mockup-dot"></span><span class="mockup-dot"></span
+              ><span class="mockup-dot"></span>
+              <span
+                style="
+                  color: rgba(255, 255, 255, 0.7);
+                  font-size: 0.8rem;
+                  margin-left: 1rem;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+                "
+                >pipeline-architecture</span
+              >
             </div>
 
-            <div class="hero-mockup fade-up">
-                <div class="mockup-window glass-panel" style="padding: 2rem;">
-                    <div class="mockup-toolbar" style="margin-bottom: 2rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
-                        <span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span>
-                        <span style="color: rgba(255,255,255,0.7); font-size: 0.8rem; margin-left: 1rem; font-family: 'JetBrains Mono', monospace; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">pipeline-architecture</span>
-                    </div>
-                    
-                    <div class="mindmap-container">
-                        <div class="mindmap-svg-wrap">
-                            <svg class="mindmap-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                <path d="M 30 25 C 40 25, 40 50, 50 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-width="0.3" stroke-dasharray="1 1"/>
-                                <path d="M 30 75 C 40 75, 40 50, 50 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-width="0.3" stroke-dasharray="1 1"/>
-                                <path d="M 50 50 L 70 50" fill="none" stroke="rgba(255,107,107,0.4)" stroke-width="0.3" stroke-dasharray="1 1"/>
-                            </svg>
-                        </div>
-                        
-                        <div class="mindmap-col">
-                            <div class="mindmap-node glass-panel">
-                                <div class="mm-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
-                                </div>
-                                <div class="mm-title">Thermal Image</div>
-                                <div class="mm-desc">Surface temperature pattern of the pod</div>
-                            </div>
-                            
-                            <div class="mindmap-node glass-panel">
-                                <div class="mm-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                                </div>
-                                <div class="mm-title">Acoustic Signal</div>
-                                <div class="mm-desc">Vibration response from tapping the pod</div>
-                            </div>
-                        </div>
-                        
-                        <div class="mindmap-col">
-                            <div class="mindmap-node glass-panel central-node">
-                                <div class="mm-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                                </div>
-                                <div class="mm-title">SVM Fusion Model</div>
-                                <div class="mm-desc">Combines both signal types into one feature vector for classification</div>
-                            </div>
-                        </div>
-                        
-                        <div class="mindmap-col">
-                            <div class="mindmap-node glass-panel">
-                                <div class="mm-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                                </div>
-                                <div class="mm-title">Ripeness Prediction</div>
-                                <div class="mm-desc">Predicted label + confidence score</div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="mindmap-container">
+              <div class="mindmap-svg-wrap">
+                <svg
+                  class="mindmap-svg"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d="M 30 25 C 40 25, 40 50, 50 50"
+                    fill="none"
+                    stroke="rgba(255,107,107,0.4)"
+                    stroke-width="0.3"
+                    stroke-dasharray="1 1"
+                  />
+                  <path
+                    d="M 30 75 C 40 75, 40 50, 50 50"
+                    fill="none"
+                    stroke="rgba(255,107,107,0.4)"
+                    stroke-width="0.3"
+                    stroke-dasharray="1 1"
+                  />
+                  <path
+                    d="M 50 50 L 70 50"
+                    fill="none"
+                    stroke="rgba(255,107,107,0.4)"
+                    stroke-width="0.3"
+                    stroke-dasharray="1 1"
+                  />
+                </svg>
+              </div>
+
+              <div class="mindmap-col">
+                <div class="mindmap-node glass-panel">
+                  <div class="mm-icon">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="mm-title">Thermal Image</div>
+                  <div class="mm-desc">
+                    Surface temperature pattern of the pod
+                  </div>
                 </div>
+
+                <div class="mindmap-node glass-panel">
+                  <div class="mm-icon">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="2"
+                    >
+                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                  </div>
+                  <div class="mm-title">Acoustic Signal</div>
+                  <div class="mm-desc">
+                    Vibration response from tapping the pod
+                  </div>
+                </div>
+              </div>
+
+              <div class="mindmap-col">
+                <div class="mindmap-node glass-panel central-node">
+                  <div class="mm-icon">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                      />
+                    </svg>
+                  </div>
+                  <div class="mm-title">SVM Fusion Model</div>
+                  <div class="mm-desc">
+                    Combines both signal types into one feature vector for
+                    classification
+                  </div>
+                </div>
+              </div>
+
+              <div class="mindmap-col">
+                <div class="mindmap-node glass-panel">
+                  <div class="mm-icon">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                      />
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                      <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg>
+                  </div>
+                  <div class="mm-title">Ripeness Prediction</div>
+                  <div class="mm-desc">Predicted label + confidence score</div>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
+      </div>
     </section>
 
     <!-- SECTION 2: TEASER -->
-    <section class="section" style="padding-top: 40px; padding-bottom: 40px;">
-        <div class="container" style="position: relative; z-index: 1;">
-            <div class="glass-panel fade-up" style="padding: 2rem; text-align: center; border-radius: var(--radius); border-color: rgba(255,107,107,0.2);">
-                <h3 style="font-size: 24px; font-weight: 700; margin-bottom: 1rem; color: var(--accent-light);">Curious about the science?</h3>
-                <p style="color: rgba(255,255,255,0.8); margin-bottom: 1.5rem;">Read a detailed breakdown of how we extract features and train the SVM classifier.</p>
-                <a href="how-it-works.html" class="btn btn-primary btn-lg">Read How It Works <span class="btn-arrow">&rarr;</span></a>
-            </div>
+    <section class="section" style="padding-top: 40px; padding-bottom: 40px">
+      <div class="container" style="position: relative; z-index: 1">
+        <div
+          class="glass-panel fade-up"
+          style="
+            padding: 2rem;
+            text-align: center;
+            border-radius: var(--radius);
+            border-color: rgba(255, 107, 107, 0.2);
+          "
+        >
+          <h3
+            style="
+              font-size: 24px;
+              font-weight: 700;
+              margin-bottom: 1rem;
+              color: var(--accent-light);
+            "
+          >
+            Curious about the science?
+          </h3>
+          <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 1.5rem">
+            Read a detailed breakdown of how we extract features and train the
+            SVM classifier.
+          </p>
+          <a href="how-it-works.html" class="btn btn-primary btn-lg"
+            >Read How It Works <span class="btn-arrow">&rarr;</span></a
+          >
         </div>
+      </div>
     </section>
 
     <!-- FOOTER -->
-    <footer class="footer" style="position: relative; z-index: 1;">
-        <div class="container">
-            <div class="footer-row-links">
-                <a href="how-it-works.html">How It Works</a>
-                <span class="footer-link-dot"></span>
-                <a href="analyser.html">Analyser</a>
-            </div>
-            <div class="footer-row-bottom">
-                <p class="footer-copy">Copyright &copy; 2026 Cocoa. Design: <a href="https://templatemo.com" target="_blank" rel="nofollow">TemplateMo</a></p>
-                <div class="footer-right">
-                    <div class="footer-legal">
-                        <a href="#" onclick="return false;">Privacy</a>
-                        <a href="#" onclick="return false;">Terms</a>
-                    </div>
-                </div>
-            </div>
+    <footer class="footer" style="position: relative; z-index: 1">
+      <div class="container">
+        <div class="footer-row-links">
+          <a href="how-it-works.html">How It Works</a>
+          <span class="footer-link-dot"></span>
+          <a href="analyser.html">Analyser</a>
         </div>
+        <div class="footer-row-bottom">
+          <p class="footer-copy">
+            Copyright &copy; 2026 Cocoa. Design:
+            <a href="https://templatemo.com" target="_blank" rel="nofollow"
+              >TemplateMo</a
+            >
+          </p>
+          <div class="footer-right">
+            <div class="footer-legal">
+              <a href="#" onclick="return false;">Privacy</a>
+              <a href="#" onclick="return false;">Terms</a>
+            </div>
+          </div>
+        </div>
+      </div>
     </footer>
 
     <script src="templatemo-quantix-script.js"></script>
-
-</body>
+  </body>
 </html>

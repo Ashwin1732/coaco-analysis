@@ -1,0 +1,8 @@
+streamlit>=1.62.0
+numpy
+pandas
+scipy
+Pillow
+torch
+torchvision
+nptdms
